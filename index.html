@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- EBDAA_MEDIA_PWA_FINAL_V1_20260817 -->
+<!-- EBDAA_MEDIA_OWNER_CHANGES_FINAL_V2_20260817 -->
 <!-- EBDAA_MEDIA_FINAL_ADMIN_DIRECT_V3_20260817 -->
 <html lang="ar" dir="rtl">
 <head>
@@ -129,6 +129,24 @@ body.theme-dark .guide-icon{background:#202126}
   .admin-customer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
+
+
+/* Admin deleted customers management */
+.admin-deleted-entry{
+  border:1px solid var(--line);background:var(--card);border-radius:18px;padding:12px 14px;
+  margin-top:16px;flex-wrap:wrap
+}
+.admin-deleted-entry .copy{display:grid;gap:3px;min-width:0}
+.admin-deleted-entry .copy small{color:var(--muted)}
+.admin-trash-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.admin-trash-top .copy{display:grid;gap:3px;min-width:0}
+.admin-trash-top h3{margin:0}
+.admin-trash-top small{color:var(--muted)}
+.admin-trash-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:520px){
+  .admin-deleted-entry .btn,.admin-trash-actions .btn{width:100%;justify-content:center}
+  .admin-trash-top{align-items:stretch}
+}
 
 /* PWA + cross-device responsive guard */
 html,body{
@@ -390,28 +408,6 @@ async function markDeleted(id,v){
   });
 }
 
-let clearingDeleted=false;
-async function clearAllDeleted(){
-  if(clearingDeleted)return;
-  const rows=deleted();
-  if(!rows.length){toast("لا توجد سجلات محذوفة");return}
-  if(!confirm(`تأكيد الحذف النهائي لجميع السجلات المحذوفة (${rows.length})؟ لا يمكن التراجع بعد ذلك.`))return;
-  clearingDeleted=true;
-  try{
-    const f=await ensureAuthorized();
-    const q=f.s.query(f.s.collection(f.db,COL),f.s.where("deleted","==",true));
-    const snap=await f.s.getDocs(q);
-    const docs=snap.docs;
-    for(let i=0;i<docs.length;i+=400){
-      const batch=f.s.writeBatch(f.db);
-      docs.slice(i,i+400).forEach(d=>batch.delete(d.ref));
-      await batch.commit();
-    }
-    toast("تم حذف جميع المحذوفين نهائياً","success");
-  }finally{
-    clearingDeleted=false;
-  }
-}
 const active=()=>state.rows.filter(x=>x.deleted!==true),deleted=()=>state.rows.filter(x=>x.deleted===true),status=s=>active().filter(x=>x.status===s),section=s=>active().filter(x=>x.section===s);
 function setView(v){state.view=v;if(v==="home")state.section="";$$("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));render()}
 function info(){return{home:["الرئيسية","اختر القسم الذي تريد العمل عليه"],section:[SEC[state.section]||"القسم","لوحة عمل القسم"],follow:["المتابعة","راقب حالات العمل من مكان واحد"],customers:["جميع العملاء","بحث وتعديل وإدارة السجلات"],deleted:["سجل المحذوفين","استرجاع العملاء المحذوفين"]}[state.view]}
@@ -441,7 +437,7 @@ function refreshSearchResults(){
 function follow(){let r=visibleRows();return`<div class="head"><div><h2>متابعة العمل</h2><p>فلترة مباشرة حسب الحالة</p></div><button class="btn gold" type="button" data-action="quick">${icon("plus")}<span>إضافة عميل</span></button></div><div class="kpis">${fk("all","كل الحالات",active().length)}${fk("waiting","قيد الانتظار",status("waiting").length)}${fk("review","قيد المراجعة",status("review").length)}${fk("processing","قيد المعالجة",status("processing").length)}</div><div class="head"><div><h2>العملاء</h2><p><span id="resultCount">${r.length}</span> سجل مطابق</p></div></div>${bar()}<div id="cardsGrid" class="cards">${cards(r,false)}</div>`}
 function fk(k,l,n){return`<div class="kpi click ${state.filter===k?"active":""}" data-filter="${k}"><small>${l}</small><strong>${n}</strong></div>`}
 function customers(){let r=visibleRows();return`<div class="head"><div><h2>جميع العملاء</h2><p><span id="resultCount">${r.length}</span> سجل</p></div><button class="btn gold" type="button" data-action="quick">${icon("plus")}<span>إضافة عميل</span></button></div>${bar()}<div id="cardsGrid" class="cards">${cards(r,false)}</div>`}
-function trash(){let r=visibleRows();return`<div class="head"><div><h2>سجل المحذوفين</h2><p><span id="resultCount">${r.length}</span> سجل محذوف • يمكن إرجاع العميل بنفس بياناته</p></div>${deleted().length?`<button class="btn danger" type="button" data-clear-deleted>${icon("trash")}<span>حذف جميع المحذوفين</span></button>`:""}</div>${bar()}<div id="cardsGrid" class="cards">${cards(r,true)}</div>`}
+function trash(){let r=visibleRows();return`<div class="head"><div><h2>سجل المحذوفين</h2><p><span id="resultCount">${r.length}</span> سجل محذوف • يمكن إرجاع العميل بنفس بياناته</p></div></div>${bar()}<div id="cardsGrid" class="cards">${cards(r,true)}</div>`}
 function cards(r,d){if(!r.length)return'<div class="empty"><b>لا توجد سجلات</b><span>سيظهر العملاء هنا بعد إضافتهم.</span></div>';return r.map(x=>`<article class="card"><div class="card-head"><div><h3>${esc(x.customerName)}</h3><p>@${esc(x.username)} • ${esc(SEC[x.section]||"-")}</p></div><span class="status ${x.status||"waiting"}">${esc(STATUS[x.status]||"-")}</span></div><div class="meta-grid"><div class="meta"><small>نوع المهمة</small><b>${esc(x.taskType||"-")}</b></div><div class="meta"><small>المنصة</small><b>${esc(x.platform||"-")}</b></div><div class="meta"><small>الموظف المستلم</small><b>${esc(x.employeeName||"-")}</b></div><div class="meta"><small>المبلغ</small><b>${money(x.amount)}</b></div></div><div class="actions"><button class="btn soft" type="button" data-details="${x.id}">${icon("eye")}<span>التفاصيل</span></button>${d?`<button class="btn success" type="button" data-restore="${x.id}">${icon("restore")}<span>إرجاع العميل</span></button>`:`<button class="btn soft" type="button" data-edit="${x.id}">${icon("edit")}<span>تعديل</span></button><button class="btn danger" type="button" data-delete="${x.id}">${icon("trash")}<span>حذف</span></button>`}</div></article>`).join("")}
 function modal(section,row=null){
   let v=(k,d="")=>esc(row?.[k]??d),sec=row?.section||section||"support",st=row?.status||"waiting";
@@ -475,6 +471,7 @@ function open(h){$("#modal").innerHTML=h}
 function close(){
   const wasDirectAdmin=!!$("#modal [data-admin-panel]");
   $("#modal").innerHTML="";
+  if(wasDirectAdmin){adminRows=[]}
   if(wasDirectAdmin&&adminDirectSession){
     adminDirectSession=false;
     adminDirectMode=false;
@@ -494,7 +491,8 @@ function statsFromRows(allRows){
   };
   return{
     total:r.length,
-    amount:r.reduce((a,x)=>a+Number(x.amount||0),0),
+    supportAmount:r.filter(x=>x.section==="support").reduce((a,x)=>a+Number(x.amount||0),0),
+    recoveryAmount:r.filter(x=>x.section==="recovery").reduce((a,x)=>a+Number(x.amount||0),0),
     support:r.filter(x=>x.section==="support").length,
     recovery:r.filter(x=>x.section==="recovery").length,
     waiting:r.filter(x=>x.status==="waiting").length,
@@ -532,6 +530,135 @@ function adminCustomerCards(rows){
       </div>
     </article>
   `).join("");
+}
+
+
+let adminRows=[];
+
+function adminDeletedCards(rows){
+  if(!rows.length){
+    return '<div class="empty"><b>لا يوجد عملاء محذوفون</b><span>أي عميل يُحذف من واجهة الموظفين سيظهر هنا.</span></div>';
+  }
+  return rows.map(r=>`
+    <article class="admin-customer">
+      <div class="admin-customer-head">
+        <div>
+          <h4>${esc(r.customerName||"-")}</h4>
+          <p>@${esc(r.username||"-")} • ${esc(SEC[r.section]||"-")}</p>
+        </div>
+        <span class="status ${r.status||"waiting"}">${esc(STATUS[r.status]||"-")}</span>
+      </div>
+      <div class="admin-customer-grid">
+        <div class="meta"><small>المبلغ</small><b>${money(r.amount)}</b></div>
+        <div class="meta"><small>نوع المهمة</small><b>${esc(r.taskType||"-")}</b></div>
+        <div class="meta"><small>الموظف المستلم</small><b>${esc(r.employeeName||"-")}</b></div>
+        <div class="meta"><small>المنصة</small><b>${esc(r.platform||"-")}</b></div>
+        <div class="meta"><small>رقم الجهاز</small><b>${esc(r.deviceNumber||"-")}</b></div>
+        <div class="meta"><small>نوع الدفع</small><b>${esc(r.paymentType||"-")}</b></div>
+        <div class="meta"><small>نوع الاشتراك</small><b>${esc(r.subscriptionType||"-")}</b></div>
+        <div class="meta"><small>تاريخ العميل</small><b>${esc(formatCustomerDate(r.customerDate))}</b></div>
+      </div>
+      <div class="admin-trash-actions">
+        <button class="btn success" type="button" data-admin-restore="${r.id}">${icon("restore")}<span>استرجاع العميل</span></button>
+        <button class="btn danger" type="button" data-admin-hard-delete="${r.id}">${icon("trash")}<span>حذف نهائي</span></button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderAdminDashboard(){
+  const body=$("#modal .modal-body");
+  if(!body)return;
+  const activeRows=adminRows.filter(x=>x.deleted!==true);
+  const s=statsFromRows(adminRows);
+
+  body.innerHTML=`
+    <div class="admin-summary">
+      ${[
+        ["إجمالي العملاء",s.total],
+        ["إجمالي مبالغ الدعم",money(s.supportAmount)],
+        ["إجمالي مبالغ فك الحسابات",money(s.recoveryAmount)],
+        ["الدعم",s.support],
+        ["الاسترجاع",s.recovery],
+        ["قيد الانتظار",s.waiting],
+        ["قيد المراجعة",s.review],
+        ["قيد المعالجة",s.processing],
+        ["مكتمل",s.completed],
+        ["المحذوفين",s.deleted],
+        ["أكثر مهمة",s.task],
+        ["أكثر موظف",s.employee],
+        ["أكثر منصة",s.platform]
+      ].map(([a,b])=>`
+        <div class="admin-card">
+          <small>${esc(a)}</small>
+          <strong>${esc(b)}</strong>
+        </div>
+      `).join("")}
+    </div>
+
+    <div class="admin-deleted-entry">
+      <div class="copy">
+        <b>إدارة العملاء المحذوفين</b>
+        <small>${s.deleted} عميل محذوف • الاسترجاع والحذف النهائي من الإدارة</small>
+      </div>
+      <button class="btn danger" type="button" data-admin-deleted>${icon("trash")}<span>فتح المحذوفين</span></button>
+    </div>
+
+    <div class="admin-toolbar">
+      <h3>تفاصيل العملاء</h3>
+      <span class="admin-count">${activeRows.length} عميل</span>
+    </div>
+
+    <div class="admin-list">
+      ${adminCustomerCards(activeRows)}
+    </div>
+  `;
+}
+
+function renderAdminDeleted(){
+  const body=$("#modal .modal-body");
+  if(!body)return;
+  const rows=adminRows.filter(x=>x.deleted===true);
+  body.innerHTML=`
+    <div class="admin-trash-top">
+      <div class="copy">
+        <h3>العملاء المحذوفين</h3>
+        <small>${rows.length} سجل • يمكنك استرجاع العميل أو حذفه نهائياً</small>
+      </div>
+      <button class="btn soft" type="button" data-admin-back>${icon("chevron")}<span>رجوع للإدارة</span></button>
+    </div>
+    <div class="admin-list">
+      ${adminDeletedCards(rows)}
+    </div>
+  `;
+}
+
+async function adminRestoreCustomer(id){
+  const row=adminRows.find(x=>x.id===id&&x.deleted===true);
+  if(!row){toast("تعذر العثور على العميل","error");return}
+  await markDeleted(id,false);
+  row.deleted=false;
+  row.deletedAt=null;
+  toast("تم استرجاع العميل","success");
+  renderAdminDeleted();
+}
+
+async function adminPermanentDelete(id){
+  const row=adminRows.find(x=>x.id===id&&x.deleted===true);
+  if(!row){toast("تعذر العثور على العميل","error");return}
+  if(!confirm(`تأكيد الحذف النهائي للعميل ${row.customerName}؟ لا يمكن التراجع بعد ذلك.`))return;
+
+  const f=await ensureAuthorized();
+  const ref=f.s.doc(f.db,COL,id);
+  const current=await f.s.getDoc(ref);
+  if(!current.exists()||current.data().deleted!==true){
+    toast("الحذف النهائي متاح فقط للعميل الموجود في سجل المحذوفين","error");
+    return;
+  }
+  await f.s.deleteDoc(ref);
+  adminRows=adminRows.filter(x=>x.id!==id);
+  toast("تم حذف العميل نهائياً","success");
+  renderAdminDeleted();
 }
 
 let adminDirectMode=false;
@@ -610,45 +737,8 @@ window.__openEbdaaAdmin=async function(){
       )
     );
 
-    const allRows=snap.docs.map(d=>({id:d.id,...d.data()}));
-    const activeRows=allRows.filter(x=>x.deleted!==true);
-    const s=statsFromRows(allRows);
-
-    const body=$("#modal .modal-body");
-    if(!body)return;
-
-    body.innerHTML=`
-      <div class="admin-summary">
-        ${[
-          ["إجمالي العملاء",s.total],
-          ["إجمالي المبالغ",money(s.amount)],
-          ["الدعم",s.support],
-          ["الاسترجاع",s.recovery],
-          ["قيد الانتظار",s.waiting],
-          ["قيد المراجعة",s.review],
-          ["قيد المعالجة",s.processing],
-          ["مكتمل",s.completed],
-          ["المحذوفين",s.deleted],
-          ["أكثر مهمة",s.task],
-          ["أكثر موظف",s.employee],
-          ["أكثر منصة",s.platform]
-        ].map(([a,b])=>`
-          <div class="admin-card">
-            <small>${esc(a)}</small>
-            <strong>${esc(b)}</strong>
-          </div>
-        `).join("")}
-      </div>
-
-      <div class="admin-toolbar">
-        <h3>تفاصيل العملاء</h3>
-        <span class="admin-count">${activeRows.length} عميل</span>
-      </div>
-
-      <div class="admin-list">
-        ${adminCustomerCards(activeRows)}
-      </div>
-    `;
+    adminRows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderAdminDashboard();
   }catch(err){
     console.error("Admin direct:",err);
 
@@ -740,10 +830,27 @@ document.addEventListener("click",async e=>{
     applyTheme(document.body.classList.contains("theme-dark")?"light":"dark");
     return;
   }
-  if(e.target.closest("[data-clear-deleted]")){
-    try{await clearAllDeleted()}catch(err){console.error(err);toast("تعذر حذف جميع المحذوفين","error")}
+  if(e.target.closest("[data-admin-deleted]")){
+    renderAdminDeleted();
     return;
-  }let v=e.target.closest("[data-view]");if(v){setView(v.dataset.view);return}let s=e.target.closest("[data-section]");if(s){state.section=s.dataset.section;state.view="section";render();return}if(e.target.closest('[data-action="quick"]')){open(quick());return}let a=e.target.closest("[data-add]");if(a){close();open(modal(a.dataset.add));return}if(e.target.matches("[data-backdrop]")){close();return}if(e.target.closest("[data-close]")){close();return}let f=e.target.closest("[data-filter]");if(f){state.filter=f.dataset.filter;render();return}if(e.target.closest("[data-clear]")){state.q="";const s=$("#search");if(s){s.value="";s.focus()}refreshSearchResults();return}let d=e.target.closest("[data-details]");if(d){let r=state.rows.find(x=>x.id===d.dataset.details);if(r)open(details(r));return}let ed=e.target.closest("[data-edit]");if(ed){let r=state.rows.find(x=>x.id===ed.dataset.edit);if(r)open(modal("",r));return}let de=e.target.closest("[data-delete]");if(de){let r=state.rows.find(x=>x.id===de.dataset.delete);if(r&&confirm(`تأكيد حذف العميل ${r.customerName}؟`)){await markDeleted(r.id,true);toast("تم نقل العميل للمحذوفين","success")}return}let rs=e.target.closest("[data-restore]");if(rs){await markDeleted(rs.dataset.restore,false);toast("تم إرجاع العميل","success");return}})
+  }
+  if(e.target.closest("[data-admin-back]")){
+    renderAdminDashboard();
+    return;
+  }
+  const adminRestore=e.target.closest("[data-admin-restore]");
+  if(adminRestore){
+    try{await adminRestoreCustomer(adminRestore.dataset.adminRestore)}
+    catch(err){console.error("Admin restore:",err);toast("تعذر استرجاع العميل","error")}
+    return;
+  }
+  const adminHardDelete=e.target.closest("[data-admin-hard-delete]");
+  if(adminHardDelete){
+    try{await adminPermanentDelete(adminHardDelete.dataset.adminHardDelete)}
+    catch(err){console.error("Admin permanent delete:",err);toast("تعذر حذف العميل نهائياً","error")}
+    return;
+  }
+let v=e.target.closest("[data-view]");if(v){setView(v.dataset.view);return}let s=e.target.closest("[data-section]");if(s){state.section=s.dataset.section;state.view="section";render();return}if(e.target.closest('[data-action="quick"]')){open(quick());return}let a=e.target.closest("[data-add]");if(a){close();open(modal(a.dataset.add));return}if(e.target.matches("[data-backdrop]")){close();return}if(e.target.closest("[data-close]")){close();return}let f=e.target.closest("[data-filter]");if(f){state.filter=f.dataset.filter;render();return}if(e.target.closest("[data-clear]")){state.q="";const s=$("#search");if(s){s.value="";s.focus()}refreshSearchResults();return}let d=e.target.closest("[data-details]");if(d){let r=state.rows.find(x=>x.id===d.dataset.details);if(r)open(details(r));return}let ed=e.target.closest("[data-edit]");if(ed){let r=state.rows.find(x=>x.id===ed.dataset.edit);if(r)open(modal("",r));return}let de=e.target.closest("[data-delete]");if(de){let r=state.rows.find(x=>x.id===de.dataset.delete);if(r&&confirm(`تأكيد حذف العميل ${r.customerName}؟`)){await markDeleted(r.id,true);toast("تم نقل العميل للمحذوفين","success")}return}let rs=e.target.closest("[data-restore]");if(rs){await markDeleted(rs.dataset.restore,false);toast("تم إرجاع العميل","success");return}})
 
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&$("#modal")&&$("#modal").innerHTML.trim()){
